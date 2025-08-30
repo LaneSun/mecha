@@ -11,6 +11,7 @@ const builtin = std.builtin;
 
 pub const ascii = @import("src/ascii.zig");
 pub const utf8 = @import("src/utf8.zig");
+// pub const dsl = @import("src/dsl.zig");
 
 const mecha = @This();
 
@@ -1188,4 +1189,74 @@ pub fn expectOk(
     actual: Result(T),
 ) !void {
     return try expectResult(T, Result(T).ok(expected_index, expected_value), actual);
+}
+
+test "comptime alloc" {
+    comptime {
+        var node_pool: [1000]AstNode = undefined;
+        node_pool[0] = AstNode{ .type = .Scope };
+        node_pool[1] = AstNode{ .type = .Block };
+        var pool = AstNodePool.create(&node_pool);
+        const node = pool.push(AstNode{ .type = .Block });
+        _ = parseAst(node);
+    }
+}
+
+const AstNode = struct {
+    const AstType = enum {
+        Scope,
+        Block,
+        Noop,
+        Eos,
+        Rest,
+        String,
+        ManyN,
+        Many,
+        Opt,
+        Combine,
+        OneOf,
+        AsStr,
+        Convert,
+        Map,
+        MapConst,
+        Discard,
+        IntToken,
+        Int,
+        Enumeration,
+        Ref,
+    };
+
+    type: AstType,
+};
+
+const AstNodePool = struct {
+    nodes: [*]AstNode,
+    size: usize,
+
+    fn create(ptr: [*]AstNode) AstNodePool {
+        return AstNodePool{ .nodes = ptr, .size = 0 };
+    }
+    fn push(self: *AstNodePool, node: AstNode) AstRef {
+        self.nodes[self.size] = node;
+        self.size += 1;
+        return AstRef{ .pool = self.*, .idx = self.size - 1 };
+    }
+    fn ref(self: AstNodePool, idx: usize) AstRef {
+        return AstRef{ .pool = self, .idx = idx };
+    }
+};
+
+const AstRef = struct {
+    pool: AstNodePool,
+    idx: usize,
+
+    fn get(self: AstRef) AstNode {
+        return self.pool.nodes[self.idx];
+    }
+};
+
+fn parseAst(nRef: AstRef) Parser(void) {
+    const node = nRef.get();
+    _ = node;
+    return noop;
 }
